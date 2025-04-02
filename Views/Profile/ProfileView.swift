@@ -237,7 +237,7 @@ struct ProfileView: View {
             
             HStack(spacing: 10) {
                 StatCard(value: "\(solvedProblemsCount ?? 0)", label: "Solved")
-                StatCard(value: "\(user.contributions ?? 0)", label: "Contributions")
+                StatCard(value: "\(user.contribution ?? 0)", label: "Contributions")
                 StatCard(value: "\(user.rating ?? 0)", label: "Rating")
             }
         }
@@ -457,7 +457,7 @@ struct CodeforcesUser: Codable {
     let rank: String?
     let rating: Int?
     let maxRating: Int?
-    let contributions: Int?
+    let contribution: Int?
     let solvedProblems: Int?
     let attemptedProblems: Int?
 }
