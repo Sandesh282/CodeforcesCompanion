@@ -8,6 +8,22 @@
 import SwiftUI
 import SDWebImageSwiftUI
 import CryptoKit
+import Charts
+
+struct RatingChange: Codable {
+    let contestId: Int
+    let contestName: String
+    let handle: String
+    let rank: Int
+    let ratingUpdateTimeSeconds: Int
+    let oldRating: Int
+    let newRating: Int
+}
+
+struct RatingHistoryResponse: Codable {
+    let status: String
+    let result: [RatingChange]
+}
 struct UserStatusResponse: Codable {
     let status: String
     let result: [API_Submission]
@@ -27,6 +43,7 @@ struct ProfileView: View {
     @EnvironmentObject var userManager: UserManager
     @State private var showLogoutConfirm = false
     @AppStorage("userHandle") private var storedHandle: String?
+    @State private var ratingHistory: [RatingChange] = []
     
     var userHandle: String {
         userManager.userHandle
@@ -39,6 +56,7 @@ struct ProfileView: View {
                     profileHeader(user: user)
                     ratingSection(user: user)
                     statsSection(user: user)
+                    ratingChart()
                 }
                 .padding()
             } else if let errorMessage = errorMessage {
@@ -62,148 +80,149 @@ struct ProfileView: View {
         .onAppear {
             fetchProfileData()
             fetchSolvedProblems()
+            fetchRatingHistory()
         }
     }
     
     // MARK: - Profile Header (Avatar, Handle, Rank)
     private func profileHeader(user: CodeforcesUser) -> some View {
         HStack(spacing: 16) {
-
+            
             ZStack {
-                        Circle()
-                            .fill(LinearGradient(
-                                colors: [.darkerBackground, .darkBackground],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            ))
-                            .frame(width: 80, height: 80)
-                        
-                        Image(systemName: "person.fill")
-                            .resizable()
-                            .scaledToFit()
-                            .frame(width: 40, height: 40)
-                            .foregroundStyle(
-                                LinearGradient(
-                                    colors: [.neonBlue, .neonPurple],
-                                    startPoint: .top,
-                                    endPoint: .bottom
-                                )
-                            )
-                    }
-                    .overlay(
-                        Circle()
-                            .stroke(
-                                LinearGradient(
-                                    colors: [.neonBlue, .neonPurple],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                ),
-                                lineWidth: 2
-                            )
+                Circle()
+                    .fill(LinearGradient(
+                        colors: [.darkerBackground, .darkBackground],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ))
+                    .frame(width: 80, height: 80)
+                
+                Image(systemName: "person.fill")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 40, height: 40)
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [.neonBlue, .neonPurple],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
                     )
-                    .shadow(color: .neonBlue.opacity(0.4), radius: 8)
+            }
+            .overlay(
+                Circle()
+                    .stroke(
+                        LinearGradient(
+                            colors: [.neonBlue, .neonPurple],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ),
+                        lineWidth: 2
+                    )
+            )
+            .shadow(color: .neonBlue.opacity(0.4), radius: 8)
             VStack(alignment: .leading, spacing: 4) {
                 Text(user.handle)
                     .font(.title.bold())
                 
-            Text(user.rank ?? "Unranked")
-                .font(.headline)
-                .foregroundColor(rankColor(for: user.rank ?? ""))
+                Text(user.rank ?? "Unranked")
+                    .font(.headline)
+                    .foregroundColor(rankColor(for: user.rank ?? ""))
             }
             
             Spacer()
             Button(action: {
-                        showLogoutConfirm = true
-                    }) {
-                        Image(systemName: "power")
-                            .font(.system(size: 18, weight: .bold))
-                            .foregroundColor(.red)
-                            .padding(10)
-                            .background(Circle().fill(Color.red.opacity(0.2)))
-                    }
-                    .confirmationDialog(
-                        "Logout",
-                        isPresented: $showLogoutConfirm,
-                        titleVisibility: .visible
-                    ) {
-                        Button("Log Out", role: .destructive) {
-                            storedHandle = nil
-                            userManager.userHandle = ""
-                        }
-                        Button("Cancel", role: .cancel) {}
-                    } message: {
-                        Text("Are you sure you want to log out?")
-                    }
+                showLogoutConfirm = true
+            }) {
+                Image(systemName: "power")
+                    .font(.system(size: 18, weight: .bold))
+                    .foregroundColor(.red)
+                    .padding(10)
+                    .background(Circle().fill(Color.red.opacity(0.2)))
+            }
+            .confirmationDialog(
+                "Logout",
+                isPresented: $showLogoutConfirm,
+                titleVisibility: .visible
+            ) {
+                Button("Log Out", role: .destructive) {
+                    storedHandle = nil
+                    userManager.userHandle = ""
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("Are you sure you want to log out?")
+            }
         }
         .padding(.vertical)
     }
     
     // MARK: - Rating Section
     private func ratingSection(user: CodeforcesUser) -> some View {
-
+        
         let currentRating = user.rating ?? 0
-            let maxRatingValue = user.maxRating ?? 1
-            let progressPercentage = Int((Double(currentRating) / Double(maxRatingValue)) * 100)
-            
-            return VStack(spacing: 12) {
-                HStack {
-                    Text("Rating:")
-                        .font(.headline)
-                        .foregroundColor(.textSecondary)
-                    Spacer()
-                    Text("\(currentRating)")
-                                   .font(.system(.title3).weight(.bold))
-                                   .foregroundStyle(
-                                       LinearGradient(
-                                           colors: [.neonBlue, .neonPurple],
-                                           startPoint: .leading,
-                                           endPoint: .trailing
-                                       )
-                                   )
-                        .foregroundColor(rankColor(for: user.rank ?? ""))
-                }
-                .frame(height: 20)
-                
-                ProgressView(value: Double(currentRating), total: Double(maxRatingValue)) {
-                            
-                        } currentValueLabel: {
-                            
-                        }
-                        .progressViewStyle(NeonProgressStyle())
-                        .overlay(
-                            HStack {
-                                Text("\(currentRating)/\(maxRatingValue)")
-                                    .font(.caption)
-                                Spacer()
-                                Text("\(progressPercentage)%")
-                                    .font(.caption)
-                            }
-                            .foregroundColor(.textSecondary)
-                            .padding(.horizontal, 4)
-                            .offset(y: 14)
+        let maxRatingValue = user.maxRating ?? 1
+        let progressPercentage = Int((Double(currentRating) / Double(maxRatingValue)) * 100)
+        
+        return VStack(spacing: 12) {
+            HStack {
+                Text("Rating:")
+                    .font(.headline)
+                    .foregroundColor(.textSecondary)
+                Spacer()
+                Text("\(currentRating)")
+                    .font(.system(.title3).weight(.bold))
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [.neonBlue, .neonPurple],
+                            startPoint: .leading,
+                            endPoint: .trailing
                         )
-                        .frame(height: 20)
+                    )
+                    .foregroundColor(rankColor(for: user.rank ?? ""))
             }
-            .padding()
-            .background(
+            .frame(height: 20)
+            
+            ProgressView(value: Double(currentRating), total: Double(maxRatingValue)) {
+                
+            } currentValueLabel: {
+                
+            }
+            .progressViewStyle(NeonProgressStyle())
+            .overlay(
+                HStack {
+                    Text("\(currentRating)/\(maxRatingValue)")
+                        .font(.caption)
+                    Spacer()
+                    Text("\(progressPercentage)%")
+                        .font(.caption)
+                }
+                    .foregroundColor(.textSecondary)
+                    .padding(.horizontal, 4)
+                    .offset(y: 14)
+            )
+            .frame(height: 20)
+        }
+        .padding()
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(Color.darkerBackground)
+                .overlay(
                     RoundedRectangle(cornerRadius: 12)
-                        .fill(Color.darkerBackground)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 12)
-                                .stroke(
-                                    LinearGradient(
-                                           gradient: Gradient(colors: [
-                                               .neonBlue.opacity(0.4),
-                                               .neonPurple.opacity(0.4)
-                                           ]),
-                                           startPoint: .topLeading,
-                                           endPoint: .bottomTrailing
-                                       ),
-                                       lineWidth: 1
-                                )
+                        .stroke(
+                            LinearGradient(
+                                gradient: Gradient(colors: [
+                                    .neonBlue.opacity(0.4),
+                                    .neonPurple.opacity(0.4)
+                                ]),
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            ),
+                            lineWidth: 1
                         )
                 )
-            .cornerRadius(12)
+        )
+        .cornerRadius(12)
     }
     struct NeonProgressStyle: ProgressViewStyle {
         func makeBody(configuration: Configuration) -> some View {
@@ -249,14 +268,14 @@ struct ProfileView: View {
                     RoundedRectangle(cornerRadius: 12)
                         .stroke(
                             LinearGradient(
-                                   gradient: Gradient(colors: [
-                                       .neonBlue.opacity(0.4),
-                                       .neonPurple.opacity(0.4)
-                                   ]),
-                                   startPoint: .topLeading,
-                                   endPoint: .bottomTrailing
-                               ),
-                               lineWidth: 1
+                                gradient: Gradient(colors: [
+                                    .neonBlue.opacity(0.4),
+                                    .neonPurple.opacity(0.4)
+                                ]),
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            ),
+                            lineWidth: 1
                         )
                 )
         )
@@ -271,7 +290,7 @@ struct ProfileView: View {
         let accuracy = (Double(solved) / Double(attempted)) * 100
         return String(format: "%.1f%%", accuracy)
     }
-
+    
     // MARK: - StatCard View
     struct StatCard: View {
         let value: String
@@ -302,14 +321,14 @@ struct ProfileView: View {
                         RoundedRectangle(cornerRadius: 12)
                             .stroke(
                                 LinearGradient(
-                                       gradient: Gradient(colors: [
-                                           .neonBlue.opacity(0.4),
-                                           .neonPurple.opacity(0.4)
-                                       ]),
-                                       startPoint: .topLeading,
-                                       endPoint: .bottomTrailing
-                                   ),
-                                   lineWidth: 1
+                                    gradient: Gradient(colors: [
+                                        .neonBlue.opacity(0.4),
+                                        .neonPurple.opacity(0.4)
+                                    ]),
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                ),
+                                lineWidth: 1
                             )
                     )
             )
@@ -363,15 +382,15 @@ struct ProfileView: View {
         let hashInput = "\(rand)/\(methodName)?\(paramString)#\(secret)"
         let hash = SHA512.hash(data: Data(hashInput.utf8)).map { String(format: "%02x", $0) }.joined()
         let apiSig = "\(rand)\(hash)"
-
+        
         let urlString = "https://codeforces.com/api/user.info?handles=\(userHandle)"
         print("Fetching from: \(urlString)")
-
+        
         guard let url = URL(string: urlString) else {
             errorMessage = "Invalid URL"
             return
         }
-
+        
         URLSession.shared.dataTask(with: url) { data, response, error in
             DispatchQueue.main.async {
                 if let error = error {
@@ -398,7 +417,7 @@ struct ProfileView: View {
             }
         }.resume()
     }
-
+    
     private func fetchSolvedProblems() {
         let urlString = "https://codeforces.com/api/user.status?handle=\(userHandle)&from=1&count=10000"
         
@@ -406,7 +425,7 @@ struct ProfileView: View {
             errorMessage = "Invalid URL"
             return
         }
-
+        
         URLSession.shared.dataTask(with: url) { data, _, error in
             DispatchQueue.main.async {
                 if let error = error {
@@ -449,6 +468,83 @@ struct ProfileView: View {
         }.resume()
     }
     
+    private func fetchRatingHistory() {
+        let urlString = "https://codeforces.com/api/user.rating?handle=\(userHandle)"
+        
+        guard let url = URL(string: urlString) else { return }
+        
+        URLSession.shared.dataTask(with: url) { data, _, _ in
+            guard let data = data else { return }
+            
+            do {
+                let response = try JSONDecoder().decode(RatingHistoryResponse.self, from: data)
+                DispatchQueue.main.async {
+                    self.ratingHistory = response.result.sorted {
+                        $0.ratingUpdateTimeSeconds < $1.ratingUpdateTimeSeconds
+                    }
+                }
+            } catch {
+                print("Rating history decode error:", error)
+            }
+        }.resume()
+    }
+    private func ratingChart() -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Rating Progress")
+                .font(.headline)
+                .foregroundColor(.textSecondary)
+            
+            if ratingHistory.isEmpty {
+                ProgressView()
+                    .frame(height: 150)
+            } else {
+                Chart {
+                    ForEach(ratingHistory, id: \.contestId) { change in
+                        LineMark(
+                            x: .value("Date", Date(timeIntervalSince1970: Double(change.ratingUpdateTimeSeconds))),
+                            y: .value("Rating", change.newRating)
+                        )
+                        .interpolationMethod(.catmullRom)
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [.neonBlue, .neonPurple],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
+                    }
+                }
+                .chartXAxis {
+                    AxisMarks(values: .stride(by: .month)) { value in
+                        AxisGridLine()
+                        AxisTick()
+                        AxisValueLabel(format: .dateTime.month(.abbreviated))
+                    }
+                }
+                .chartYAxis {
+                    AxisMarks(position: .leading)
+                }
+                .frame(height: 200)
+                .padding(.vertical, 8)
+            }
+        }
+        .padding()
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(Color.darkerBackground)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12)
+                        .stroke(
+                            LinearGradient(
+                                colors: [.neonBlue.opacity(0.4), .neonPurple.opacity(0.4)],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            ),
+                            lineWidth: 1
+                        )
+                )
+        )
+    }
 }
 
 // MARK: - Data Models
