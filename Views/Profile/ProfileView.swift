@@ -112,26 +112,6 @@ struct ProfileView: View {
             }
             
             Spacer()
-//            Button(action: {
-//                storedHandle = nil
-//                userManager.userHandle = ""
-//            }) {
-//                Image(systemName: "power")
-//                    .font(.system(size: 18, weight: .bold))
-//                    .foregroundColor(.red)
-//                    .padding(10)
-//                    .background(
-//                        Circle()
-//                            .fill(Color.red.opacity(0.2))
-//                    )
-//            }
-//            .confirmationDialog("Logout", isPresented: $showLogoutConfirm) {
-//                Button("Log Out", role: .destructive) {
-//                    userManager.userHandle = ""
-//                }
-//            } message: {
-//                Text("Are you sure you want to log out?")
-//            }
             Button(action: {
                         showLogoutConfirm = true
                     }) {
